@@ -1,0 +1,132 @@
+{% extends "cs/base.html" %} 
+{% load static %} 
+{% block content %}
+
+<main role="main" class="inner cover">
+  {% if user.is_authenticated %}
+    <h1 class="cover-heading">Логи 1С</h1>
+    <table class="table table-sm table-dark" id="log">
+      <thead>
+        <tr>
+          <th scope="col">Дата</th>
+          <th scope="col">Тип</th>
+          <th scope="col">Описание</th>   
+        </tr>
+      </thead>
+      <tbody>
+        {% for log_message in object_list %} 
+          {% if log_message.log_type == 'i' %}
+          <tr>
+            <th scope="row">{{ log_message.date }}</th>
+            <td>Информация</td>
+            <td>{{ log_message.text }}</td>
+          </tr>
+          {% else %}
+          <tr class="bg-danger">
+            <th scope="row">{{ log_message.date }}</th>
+            <td>Ошибка</td>
+            <td>{{ log_message.text }}</td>
+          </tr>
+          {% endif %} 
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div
+      class="alert alert-success"
+      role="alert"
+      id="success"
+      style="display: none"
+    >
+      Соединение установлено
+    </div>
+
+    <div
+      class="alert alert-danger"
+      role="alert"
+      id="danger"
+      style="display: none"
+    >
+      Соединение разорвано
+    </div>
+
+  {% else %}
+
+    <p class="lead">
+      Для отображения информации надо пройти регистрацию или войти под своим
+      пользователем
+    </p>
+
+  {% endif %}
+
+</main>
+
+<script>
+  const socket1S = new WebSocket('ws://localhost:8000/ws/log/');
+  let success = document.getElementById('success');
+  let danger = document.getElementById('danger');
+
+  socket1S.onopen = function () {
+      success.style.display = 'block';
+      console.log("Соединение установлено.");
+  };
+
+  socket1S.onclose = function (event) {
+      success.style.display = 'none';
+      danger.style.display = 'block';
+      console.error('Соединение разорвано. Код: ' + event.code + ' причина: ' + event.reason);
+  };
+
+  socket1S.onerror = function (error) {
+      console.error("Ошибка " + error.message);
+  };
+
+  socket1S.onmessage = function (event) {
+      const srv_data = JSON.parse(event.data);
+      console.log("Получено сообщение от сервера:")
+      console.log(srv_data.handler)
+      addRow(srv_data.data)
+  };
+
+  function addRow(data) {
+      // Находим нужную таблицу
+      let tbody = document.getElementById('log').getElementsByTagName('TBODY')[0];
+
+      // Создаем строку таблицы и добавляем ее
+      let row = document.createElement("TR");
+      if (data.log_type === 'E') {
+          row.classList.add("bg-danger");
+      }
+      tbody.insertBefore(row, tbody.firstElementChild);
+
+      // Создаем ячейки в вышесозданной строке и добавляем их
+      let td1 = document.createElement("TD");
+      let td2 = document.createElement("TD");
+      let td3 = document.createElement("TD");
+
+      row.appendChild(td1);
+      row.appendChild(td2);
+      row.appendChild(td3);
+
+      let options = {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          timezone: 'UTC',
+          hour: 'numeric',
+          minute: 'numeric'
+      };
+
+      // Наполняем ячейки
+      let curdate = new Date().toLocaleString("ru", options);
+      td1.innerHTML = curdate.replace(',', '');
+      if (data.log_type === 'E') {
+          td2.innerHTML = 'Ошибка';
+      } else {
+          td2.innerHTML = 'Информация';
+      }
+      td3.innerHTML = data.text;
+  }
+</script>
+
+{% endblock %}
